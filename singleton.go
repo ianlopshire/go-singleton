@@ -43,6 +43,14 @@ type lazy[T any] struct {
 	latch async.Latch
 }
 
+// Lazy is a thread-safe lazy-initialized singleton value.
+func Lazy[T any](new func() (T, error)) Singleton[T] {
+	return &lazy[T]{new: new}
+}
+
+// NewLazy is a thread-safe lazy-initialized singleton value.
+//
+// Deprecated: Use Lazy instead.
 func NewLazy[T any](new func() (T, error)) Singleton[T] {
 	return &lazy[T]{new: new}
 }
