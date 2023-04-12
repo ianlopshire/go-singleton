@@ -2,7 +2,6 @@ package singleton
 
 import (
 	"context"
-	"sync"
 
 	"github.com/ianlopshire/go-async"
 )
@@ -39,7 +38,6 @@ type lazy[T any] struct {
 	instance T
 	err      error
 
-	once  sync.Once
 	latch async.Latch
 }
 
@@ -56,22 +54,25 @@ func NewLazy[T any](new func() (T, error)) Singleton[T] {
 }
 
 func (l *lazy[T]) InstanceCtx(ctx context.Context) (T, error) {
+	select {
+	case <-l.latch.Done():
+		return l.instance, l.err
+	default:
+		// Intentionally left blank.
+	}
+
 	go func() {
-		l.once.Do(func() {
-			i, err := l.new()
-			async.Resolve(&l.latch, func() {
-				l.instance = i
-				l.err = err
-			})
+		async.Resolve(&l.latch, func() {
+			l.instance, l.err = l.new()
 		})
 	}()
 
 	select {
-	case <-l.latch.Done():
-		return l.instance, l.err
 	case <-ctx.Done():
 		var zero T
 		return zero, ctx.Err()
+	case <-l.latch.Done():
+		return l.instance, l.err
 	}
 }
 
